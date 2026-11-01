@@ -20,9 +20,9 @@ A web-based hospital management system that digitizes day-to-day hospital operat
 | Role | Responsibilities |
 |------|------------------|
 | **Admin** | Manage users, departments, doctors, and view reports |
-| **Receptionist** | Register patients, book appointments, generate bills |
+| **Patient** |  book appointments, Manage Medical Records and generate bills |
 | **Doctor** | View appointments, record diagnosis and prescriptions, request lab tests |
-| **Lab Staff** | Receive test requests, upload and update results |
+
 
 ---
 

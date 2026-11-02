@@ -1,4 +1,4 @@
-﻿@model IEnumerable<WebApplicationDocLab.Models.Prescription>
+@model IEnumerable<WebApplicationDocLab.Models.Prescription>
 @{
     ViewBag.Title = "PreviousPrescriptions";
     Layout = "~/Views/_LayoutPagePatient.cshtml";
@@ -15,16 +15,26 @@
             {
                 foreach (var prescription in Model)
                 {
+                    WebApplicationDocLab.Models.User_Info doctor = null;
+                    (ViewBag.Doctors as Dictionary<int, WebApplicationDocLab.Models.User_Info>)?.TryGetValue(prescription.DoctorId, out doctor);
                     <div class="mb-3">
-                        <!-- Display Medicine Name from Medicine with null check -->
-                        <p><strong>Medicine:</strong> @(prescription.Medicine != null ? prescription.Medicine.MedicineName : "No Medicine Assigned")</p>
-                        <!-- Display Prescription Date -->
+                        <p><strong>Medicines:</strong></p>
+                        @if (prescription.Medicine_Lists != null && prescription.Medicine_Lists.Any())
+                        {
+                            <ul>
+                                @foreach (var med in prescription.Medicine_Lists)
+                                {
+                                    <li>@(med.Medicine != null ? med.Medicine.MedicineName : "Unknown") (@med.Dosage, @med.Duration)</li>
+                                }
+                            </ul>
+                        }
+                        else
+                        {
+                            <p>No medicines assigned.</p>
+                        }
                         <p><strong>Prescription Date:</strong> @prescription.PrescriptionDate.ToShortDateString()</p>
-                        <!-- Display Doctor's Name from Doctor_Details with null check -->
                         <p>
-                            <strong>Doctor:</strong> @(prescription.Doctor_Details != null && prescription.Doctor_Details.User_Info != null
-                            ? prescription.Doctor_Details.User_Info.FirstName + " " + prescription.Doctor_Details.User_Info.LastName
-                            : "No Doctor Assigned")
+                            <strong>Doctor:</strong> @(doctor != null ? doctor.FirstName + " " + doctor.LastName : "No Doctor Assigned")
                         </p>
                         <hr />
                     </div>

@@ -1,4 +1,4 @@
-﻿@model WebApplicationDocLab.Models.Prescription
+@model WebApplicationDocLab.Models.Prescription
 @{
     ViewBag.Title = "Prescription Details";
     Layout = "~/Views/_LayoutPageDoctor.cshtml";
@@ -149,39 +149,14 @@
                 </tr>
             </thead>
             <tbody>
-                @{
-                    // Parse medicine information from Notes field
-                    var medicines = new List<dynamic>();
-                    if (!string.IsNullOrEmpty(Model.Notes))
-                    {
-                        var lines = Model.Notes.Split('\n');
-                        foreach (var line in lines)
-                        {
-                            if (line.Contains("-") && !line.StartsWith("Medicines:"))
-                            {
-                                var parts = line.Split('-');
-                                if (parts.Length >= 3)
-                                {
-                                    medicines.Add(new
-                                    {
-                                        Name = parts[0].Trim(),
-                                        Dosage = parts[1].Trim(),
-                                        Duration = parts[2].Trim()
-                                    });
-                                }
-                            }
-                        }
-                    }
-                }
-
-                @if (medicines.Any())
+                @if (Model.Medicine_Lists != null && Model.Medicine_Lists.Any())
                 {
-                    foreach (var med in medicines)
+                    foreach (var med in Model.Medicine_Lists)
                     {
                         <tr>
-                            <td>@med.Name</td>
-                            <td>@med.Dosage</td>
-                            <td>@med.Duration</td>
+                            <td>@(med.Medicine?.MedicineName ?? "Unknown")</td>
+                            <td>@(med.Dosage ?? "-")</td>
+                            <td>@(med.Duration ?? "-")</td>
                         </tr>
                     }
                 }
@@ -195,33 +170,22 @@
         </table>
     </div>
 
+    @if (Model.Test_Lists != null && Model.Test_Lists.Any())
+    {
+        <div class="section">
+            <div class="section-title">Tests</div>
+            <ul>
+                @foreach (var test in Model.Test_Lists)
+                {
+                    <li>@(test.Test?.TestName ?? "Unknown")</li>
+                }
+            </ul>
+        </div>
+    }
+
     <div class="section">
         <div class="section-title">Additional Notes</div>
-        <p>
-            @{
-                // Extract additional notes (skip medicine lines)
-                string additionalNotes = "";
-                if (!string.IsNullOrEmpty(Model.Notes))
-                {
-                    var lines = Model.Notes.Split('\n');
-                    bool isAfterMedicines = false;
-
-                    foreach (var line in lines)
-                    {
-                        if (string.IsNullOrWhiteSpace(line))
-                        {
-                            isAfterMedicines = true;
-                        }
-
-                        if (isAfterMedicines && !line.StartsWith("Medicines:"))
-                        {
-                            additionalNotes += line + "\n";
-                        }
-                    }
-                }
-            }
-            @additionalNotes.Trim()
-        </p>
+        <p>@Model.Notes</p>
     </div>
 
     <div class="signature-section">

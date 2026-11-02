@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\packages\EntityFramework.6.5.1\build\EntityFramework.props" Condition="Exists('..\packages\EntityFramework.6.5.1\build\EntityFramework.props')" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
@@ -194,9 +194,6 @@
     <Compile Include="Controllers\MessageController.cs" />
     <Compile Include="Controllers\MTController.cs" />
     <Compile Include="Controllers\PatientController.cs" />
-    <Compile Include="D:/CODE/.NET/Project/WebApplicationDocLab/WebApplicationDocLab/Models/\AppointmentViewModel.cs">
-      <Link>AppointmentViewModel.cs</Link>
-    </Compile>
     <Compile Include="Global.asax.cs">
       <DependentUpon>Global.asax</DependentUpon>
     </Compile>
@@ -249,6 +246,8 @@
     <Compile Include="Models\Test_List.cs" />
     <Compile Include="Models\User_Info.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Security\PasswordHasher.cs" />
+    <Compile Include="Infrastructure\EmailSender.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="assets\css\main.css" />
@@ -352,12 +351,8 @@
     <Content Include="Content\bootstrap.min.css" />
     <Content Include="Content\bootstrap.rtl.css" />
     <Content Include="Content\bootstrap.rtl.min.css" />
-    <Content Include="D:/CODE/.NET/Project/WebApplicationDocLab/WebApplicationDocLab/Content/\admin-appointments.css">
-      <Link>admin-appointments.css</Link>
-    </Content>
-    <Content Include="D:/CODE/.NET/Project/WebApplicationDocLab/WebApplicationDocLab/Scripts/\admin-appointments.js">
-      <Link>admin-appointments.js</Link>
-    </Content>
+    <Content Include="Content\admin-appointments.css" />
+    <Content Include="Scripts\admin-appointments.js" />
     <Content Include="favicon.ico" />
     <Content Include="forms\appointment.php" />
     <Content Include="forms\contact.php" />
@@ -428,9 +423,7 @@
     <Content Include="Scripts\bootstrap.esm.min.js" />
     <Content Include="Scripts\bootstrap.js" />
     <Content Include="Scripts\bootstrap.min.js" />
-    <None Include="D:/CODE/.NET/Project/WebApplicationDocLab/WebApplicationDocLab/Views/Admin/\Appointments.cshtml">
-      <Link>Appointments.cshtml</Link>
-    </None>
+    <Content Include="Views\Admin\Appointments.cshtml" />
     <None Include="Scripts\jquery-3.7.1.intellisense.js" />
     <Content Include="Scripts\jquery-3.7.1.js" />
     <Content Include="Scripts\jquery-3.7.1.min.js" />

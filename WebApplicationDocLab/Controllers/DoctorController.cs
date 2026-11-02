@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data.Entity;
 using System.IO;
@@ -13,12 +13,27 @@ using iTextSharp.text.pdf;
 using System.Drawing.Printing;
 using System.Xml.Linq;
 using Newtonsoft.Json;
+using WebApplicationDocLab.Security;
 
 namespace WebApplicationDocLab.Controllers
 {
     public class DoctorController : Controller
     {
         private DoctorLab _db = new DoctorLab();
+
+        protected override void OnActionExecuting(ActionExecutingContext filterContext)
+        {
+            if (Session["UserId"] == null || Session["UserType"] == null || Session["UserType"].ToString() != "Doctor")
+            {
+                filterContext.Result = new RedirectToRouteResult(
+                    new System.Web.Routing.RouteValueDictionary {
+                        { "controller", "Login" },
+                        { "action", "Login" }
+                    });
+            }
+
+            base.OnActionExecuting(filterContext);
+        }
 
         // ====================
         // 1. DASHBOARD
@@ -31,15 +46,15 @@ namespace WebApplicationDocLab.Controllers
             var todayAppointments = _db.BookingAppointments
                 .Where(b => b.DoctorId == doctorId &&
                             DbFunctions.TruncateTime(b.Booking_Date) == today &&
-                            b.User_Info != null)
-                .Include("User_Info")
+                            b.Patient != null)
+                .Include(b => b.Patient)
                 .ToList();
 
             var upcomingAppointments = _db.BookingAppointments
                 .Where(b => b.DoctorId == doctorId &&
                             DbFunctions.TruncateTime(b.Booking_Date) > today &&
-                            b.User_Info != null)
-                .Include("User_Info")
+                            b.Patient != null)
+                .Include(b => b.Patient)
                 .ToList();
 
             var prescriptions = _db.Prescriptions
@@ -73,7 +88,7 @@ namespace WebApplicationDocLab.Controllers
             var doctorId = GetCurrentDoctorId();
 
             var appointments = _db.BookingAppointments
-                .Include(a => a.User_Info)
+                .Include(a => a.Patient)
                 .Where(a => a.DoctorId == doctorId)
                 .OrderBy(a => a.Booking_Date)
                 .ToList();
@@ -201,6 +216,7 @@ namespace WebApplicationDocLab.Controllers
 
             var prescriptions = _db.Prescriptions
                 .Where(p => p.PatientId == id && p.DoctorId == doctorId)
+                .Include(p => p.Medicine_Lists.Select(m => m.Medicine))
                 .ToList();
 
             var model = new PatientDetailsViewModel
@@ -272,15 +288,17 @@ namespace WebApplicationDocLab.Controllers
                         // Save medicines to Medicine_List
                         if (!string.IsNullOrEmpty(medicineData))
                         {
-                            // medicineData is expected to be a JSON array like:
+                            // medicineData is a JSON array like:
                             // [{ Id: 1, Name: "...", Dosage: "...", Duration: "..." }]
-                            var medicines = JsonConvert.DeserializeObject<List<Medicine_List>>(medicineData);
+                            var medicines = JsonConvert.DeserializeObject<List<MedicineCartItem>>(medicineData);
 
                             foreach (var med in medicines)
                             {
                                 var medList = new Medicine_List
                                 {
-                                    MedicinID = med.Id.ToString(), // or int.Parse if needed
+                                    MedicineId = med.Id,
+                                    Dosage = med.Dosage,
+                                    Duration = med.Duration,
                                     PrescriptionId = prescription.Id,
                                     Created_at = DateTime.Now
                                 };
@@ -291,9 +309,9 @@ namespace WebApplicationDocLab.Controllers
                         // Save tests to Test_List
                         if (!string.IsNullOrEmpty(testData))
                         {
-                            // testData is expected to be a JSON array like:
+                            // testData is a JSON array like:
                             // [{ Id: 2, Name: "Blood Test" }]
-                            var tests = JsonConvert.DeserializeObject<List<Test_List>>(testData);
+                            var tests = JsonConvert.DeserializeObject<List<TestCartItem>>(testData);
 
                             foreach (var test in tests)
                             {
@@ -327,12 +345,19 @@ namespace WebApplicationDocLab.Controllers
         }
 
 
-        // Helper class for deserialization
-        public class MedicineEntry
+        // Shapes matching the JSON carts built client-side in CreatePrescription.cshtml
+        public class MedicineCartItem
         {
-            public int MedicineId { get; set; }
+            public int Id { get; set; }
+            public string Name { get; set; }
             public string Dosage { get; set; }
             public string Duration { get; set; }
+        }
+
+        public class TestCartItem
+        {
+            public int Id { get; set; }
+            public string Name { get; set; }
         }
 
         // ====================
@@ -342,6 +367,8 @@ namespace WebApplicationDocLab.Controllers
         {
             var prescription = _db.Prescriptions
                 .Include(p => p.User_Info)
+                .Include(p => p.Medicine_Lists.Select(m => m.Medicine))
+                .Include(p => p.Test_Lists.Select(t => t.Test))
                 .FirstOrDefault(p => p.Id == id);
 
             if (prescription == null)
@@ -362,7 +389,9 @@ namespace WebApplicationDocLab.Controllers
 
         public ActionResult DownloadPrescription(int id)
         {
-            var prescription = _db.Prescriptions.Find(id);
+            var prescription = _db.Prescriptions
+                .Include(p => p.Medicine_Lists.Select(m => m.Medicine))
+                .FirstOrDefault(p => p.Id == id);
             if (prescription == null)
             {
                 return HttpNotFound("Prescription not found");
@@ -434,13 +463,21 @@ namespace WebApplicationDocLab.Controllers
                 table.AddCell(new PdfPCell(new Phrase("Dosage", FontFactory.GetFont(FontFactory.HELVETICA_BOLD))));
                 table.AddCell(new PdfPCell(new Phrase("Duration", FontFactory.GetFont(FontFactory.HELVETICA_BOLD))));
 
-                // Parse and add medicines
-                var medicines = ParseMedicines(prescription.Notes);
-                foreach (var med in medicines)
+                // Add medicines
+                if (prescription.Medicine_Lists != null && prescription.Medicine_Lists.Any())
                 {
-                    table.AddCell(med.Name);
-                    table.AddCell(med.Dosage);
-                    table.AddCell(med.Duration);
+                    foreach (var med in prescription.Medicine_Lists)
+                    {
+                        table.AddCell(med.Medicine?.MedicineName ?? "Unknown");
+                        table.AddCell(med.Dosage ?? "-");
+                        table.AddCell(med.Duration ?? "-");
+                    }
+                }
+                else
+                {
+                    var noneCell = new PdfPCell(new Phrase("No medicines prescribed"));
+                    noneCell.Colspan = 3;
+                    table.AddCell(noneCell);
                 }
 
                 document.Add(table);
@@ -464,40 +501,6 @@ namespace WebApplicationDocLab.Controllers
                 document.Close();
                 return ms.ToArray();
             }
-        }
-
-        private List<MedicineViewModel> ParseMedicines(string notes)
-        {
-            var medicines = new List<MedicineViewModel>();
-
-            if (!string.IsNullOrEmpty(notes))
-            {
-                var lines = notes.Split('\n');
-                foreach (var line in lines)
-                {
-                    if (line.Contains("-") && !line.StartsWith("Medicines:"))
-                    {
-                        var parts = line.Split('-');
-                        if (parts.Length >= 3)
-                        {
-                            medicines.Add(new MedicineViewModel
-                            {
-                                Name = parts[0].Trim(),
-                                Dosage = parts[1].Trim(),
-                                Duration = parts[2].Trim()
-                            });
-                        }
-                    }
-                }
-            }
-            return medicines;
-        }
-
-        public class MedicineViewModel
-        {
-            public string Name { get; set; }
-            public string Dosage { get; set; }
-            public string Duration { get; set; }
         }
 
         // ====================
@@ -601,14 +604,15 @@ namespace WebApplicationDocLab.Controllers
                     return RedirectToAction("Profile");
                 }
 
-                if (doctor.Password != currentPassword)
+                bool needsRehash;
+                if (!PasswordHasher.Verify(currentPassword, doctor.Password, out needsRehash))
                 {
                     TempData["ErrorMessage"] = "Current password is incorrect";
                     return RedirectToAction("Profile");
                 }
 
-                doctor.Password = newPassword;
-                doctor.ConfirmPassword = newPassword;
+                doctor.Password = PasswordHasher.Hash(newPassword);
+                doctor.ConfirmPassword = doctor.Password;
                 _db.Entry(doctor).State = EntityState.Modified;
                 _db.SaveChanges();
 

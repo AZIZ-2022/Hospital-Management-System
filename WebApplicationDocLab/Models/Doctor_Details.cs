@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Web;
 
@@ -25,6 +26,7 @@ namespace WebApplicationDocLab.Models
         [Range(0, double.MaxValue, ErrorMessage = "Consulting fees must be a positive number.")]
         public double ConsultingFees { get; set; }
         [Required(ErrorMessage = "Status is required.")]
+        [ForeignKey("DoctorId")]
         public virtual User_Info User_Info { get; set; }
     }
     public enum DayType

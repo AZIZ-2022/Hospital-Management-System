@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Web;
 
@@ -20,8 +21,11 @@ namespace WebApplicationDocLab.Models
         [DataType(DataType.Date)]
         public DateTime PrescriptionDate { get; set; }
         public string Notes { get; set; }
+
+        [ForeignKey("PatientId")]
         public virtual User_Info User_Info { get; set; }
-        public virtual Doctor_Details Doctor_Details { get; set; }
-        public virtual Medicine Medicine { get; set; }
+
+        public virtual ICollection<Medicine_List> Medicine_Lists { get; set; }
+        public virtual ICollection<Test_List> Test_Lists { get; set; }
     }
 }

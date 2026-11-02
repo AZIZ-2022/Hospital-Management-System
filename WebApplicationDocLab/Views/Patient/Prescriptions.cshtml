@@ -1,4 +1,4 @@
-﻿@model WebApplicationDocLab.Models.Prescription
+@model WebApplicationDocLab.Models.Prescription
 
 @{
     ViewBag.Title = "Prescriptions";
@@ -11,19 +11,30 @@
             <h4>Most Recent Prescription</h4>
         </div>
         <div class="card-body">
-            @if (ViewBag.RecentPrescription?.Doctor_Details?.User_Info != null)
+            @if (ViewBag.RecentPrescription != null)
             {
+                var doctor = ViewBag.RecentPrescriptionDoctor as WebApplicationDocLab.Models.User_Info;
                 <div>
-                    <!-- Display Doctor's Name from Doctor_Details -->
                     <h5>
                         Doctor:
-                        @ViewBag.RecentPrescription.Doctor_Details.User_Info.FirstName
-                        @ViewBag.RecentPrescription.Doctor_Details.User_Info.LastName
+                        @(doctor != null ? $"{doctor.FirstName} {doctor.LastName}" : "N/A")
                     </h5>
                     <p><strong>Prescription Date:</strong> @ViewBag.RecentPrescription.PrescriptionDate.ToShortDateString()</p>
                     <p><strong>Notes:</strong> @ViewBag.RecentPrescription.Notes</p>
-                    <!-- Display Medicine Name from Medicine -->
-                    <p><strong>Medicine:</strong> @ViewBag.RecentPrescription.Medicine.MedicineName</p>
+                    <p><strong>Medicines:</strong></p>
+                    @if (ViewBag.RecentPrescription.Medicine_Lists != null && ViewBag.RecentPrescription.Medicine_Lists.Count > 0)
+                    {
+                        <ul>
+                            @foreach (var med in ViewBag.RecentPrescription.Medicine_Lists)
+                            {
+                                <li>@(med.Medicine != null ? med.Medicine.MedicineName : "Unknown") (@med.Dosage, @med.Duration)</li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <p>No medicines assigned.</p>
+                    }
                 </div>
             }
             else

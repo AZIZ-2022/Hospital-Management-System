@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -33,8 +33,12 @@ namespace WebApplicationDocLab.Models
         public string Status { get; set; }
         public DateTime Created_at { get; set; }
 
-        public virtual User_Info User_Info { get; set; }
-     
+        [ForeignKey("PatientId")]
+        public virtual User_Info Patient { get; set; }
+
+        [ForeignKey("DoctorId")]
+        public virtual User_Info Doctor { get; set; }
+
         public enum AppointmentStatus
         {
             Pending,

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -12,6 +12,7 @@ using System.Data.Entity;
 using System.Data.Entity.Validation;
 using Org.BouncyCastle.Crypto.Generators;
 using static System.Net.WebRequestMethods;
+using WebApplicationDocLab.Security;
 
 namespace WebApplicationDocLab.Controllers
 {
@@ -63,6 +64,8 @@ namespace WebApplicationDocLab.Controllers
                     model.UserType = "Doctor";
                     model.Status = "Inactive";
                     model.CreatedDate = DateTime.Now;
+                    model.Password = PasswordHasher.Hash(model.Password);
+                    model.ConfirmPassword = model.Password;
                     // Generate OTP (skip if not needed here)
                     generatedOtp = new Random().Next(100000, 999999).ToString();
                     otpExpiration = DateTime.Now.AddMinutes(5);
@@ -88,16 +91,11 @@ namespace WebApplicationDocLab.Controllers
         {
             try
             {
-                var smtpClient = new SmtpClient("smtp.gmail.com") // e.g., smtp.gmail.com
-                {
-                    Port = 587,
-                    Credentials = new NetworkCredential("jahid.hasan1217@gmail.com", "rpxx iroi vvov auor"),
-                    EnableSsl = true,
-                };
+                var smtpClient = WebApplicationDocLab.Infrastructure.EmailSender.CreateClient();
 
                 var mailMessage = new MailMessage
                 {
-                    From = new MailAddress("jahid.hasan1217@gmail.com"),
+                    From = new MailAddress(WebApplicationDocLab.Infrastructure.EmailSender.FromAddress),
                     Subject = "Your DoctorLab OTP Code",
                     Body = $"Your OTP code is: {otp}, This code validete 24 hours.",
                     IsBodyHtml = false,
@@ -173,6 +171,8 @@ namespace WebApplicationDocLab.Controllers
                     model.Status = "Active";
                     model.Image = "default.png";
                     model.CreatedDate = DateTime.Now;
+                    model.Password = PasswordHasher.Hash(model.Password);
+                    model.ConfirmPassword = model.Password;
                     // Generate OTP (skip if not needed here)
                     generatedOtp = new Random().Next(100000, 999999).ToString();
                     otpExpiration = DateTime.Now.AddMinutes(5);
@@ -217,10 +217,18 @@ namespace WebApplicationDocLab.Controllers
                     return RedirectToAction("Login");
                 }
 
-                if (user.Password != model.Password)
+                bool needsRehash;
+                if (!PasswordHasher.Verify(model.Password, user.Password, out needsRehash))
                 {
                     TempData["MsgAdd"] = "Incorrect password.";
                     return RedirectToAction("Login");
+                }
+
+                if (needsRehash)
+                {
+                    user.Password = PasswordHasher.Hash(model.Password);
+                    user.ConfirmPassword = user.Password;
+                    _contextdb.SaveChanges();
                 }
 
                 if (user.Status == "Delete")
@@ -385,7 +393,7 @@ namespace WebApplicationDocLab.Controllers
                     return RedirectToAction("ForgotPassword");
                 }
 
-                user.Password = newPassword; 
+                user.Password = PasswordHasher.Hash(newPassword);
                 user.ConfirmPassword = user.Password;
 
                 _contextdb.Entry(user).State = EntityState.Modified;
@@ -420,16 +428,11 @@ namespace WebApplicationDocLab.Controllers
         {
             try
             {
-                var smtpClient = new SmtpClient("smtp.gmail.com") 
-                {
-                    Port = 587,
-                    Credentials = new NetworkCredential("jahid.hasan1217@gmail.com", "rpxx iroi vvov auor"),
-                    EnableSsl = true,
-                };
+                var smtpClient = WebApplicationDocLab.Infrastructure.EmailSender.CreateClient();
 
                 var mailMessage = new MailMessage
                 {
-                    From = new MailAddress("jahid.hasan1217@gmail.com"),
+                    From = new MailAddress(WebApplicationDocLab.Infrastructure.EmailSender.FromAddress),
                     Subject = "Your DoctorLab password has been changed",
                     Body = $"Hello,\n\n{email} password was successfully changed. If you did not request this change, please contact support immediately.",
                     IsBodyHtml = false,

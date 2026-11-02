@@ -1,4 +1,4 @@
-﻿@model IEnumerable<WebApplicationDocLab.Models.BookingAppointment>
+@model IEnumerable<WebApplicationDocLab.Models.BookingAppointment>
 
 @{
     ViewBag.Title = "My Appointments";
@@ -40,9 +40,9 @@
                         <td>@appointment.Booking_Date.ToString("dd MMM yyyy")</td>
                         <td>@appointment.ActualTime.ToString(@"hh\:mm") - @appointment.ActualTime.Add(TimeSpan.FromMinutes(20)).ToString(@"hh\:mm")</td>
                         <td>
-                            @if (appointment.User_Info != null)
+                            @if (appointment.Doctor != null)
                             {
-                                @($"{appointment.User_Info.Title} {appointment.User_Info.FirstName} {appointment.User_Info.LastName}")
+                                @($"{appointment.Doctor.Title} {appointment.Doctor.FirstName} {appointment.Doctor.LastName}")
                             }
                         </td>
                         <td>@appointment.SerialNumber</td>

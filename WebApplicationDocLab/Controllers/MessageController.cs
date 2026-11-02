@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Data.Entity;
 using System.Linq;
 using System.Web.Mvc;
@@ -21,6 +21,10 @@ namespace WebApplicationDocLab.Controllers
 
             // Restrict patient-to-patient chat
             var otherUser = _contextdb.User_Infos.Find(userId);
+            if (otherUser == null)
+            {
+                return HttpNotFound();
+            }
             if (currentUserType == "Patient" && otherUser.UserType == "Patient")
             {
                 return new HttpStatusCodeResult(403, "Patients cannot chat with other patients.");
@@ -46,6 +50,10 @@ namespace WebApplicationDocLab.Controllers
             int senderId = (int)Session["UserId"];
             var senderType = Session["UserType"].ToString();
             var receiver = _contextdb.User_Infos.Find(receiverId);
+            if (receiver == null)
+            {
+                return HttpNotFound();
+            }
 
             // Restrict patient-to-patient chat
             if (senderType == "Patient" && receiver.UserType == "Patient")

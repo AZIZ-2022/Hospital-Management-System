@@ -1,10 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Configuration;
+using System;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
-using System.Threading.Tasks;
 using System.Web;
 using System.Web.Mvc;
 using WebApplicationDocLab.Context;
@@ -15,70 +11,51 @@ namespace WebApplicationDocLab.Controllers
     public class MedicineController : Controller
     {
         private DoctorLab _contextdb;
-        private HttpClient _httpClient;
 
         public MedicineController()
         {
             _contextdb = new DoctorLab();
-            this._httpClient = new HttpClient();
         }
+
+        protected override void OnActionExecuting(ActionExecutingContext filterContext)
+        {
+            if (Session["UserEmail"] == null || Session["UserType"] == null || Session["UserType"].ToString() != "Admin")
+            {
+                filterContext.Result = new RedirectToRouteResult(
+                    new System.Web.Routing.RouteValueDictionary {
+                        { "controller", "Login" },
+                        { "action", "Login" }
+                    });
+            }
+
+            base.OnActionExecuting(filterContext);
+        }
+
         // GET: Medicine
         public ActionResult Index()
         {
-            if (Session["UserEmail"] == null)
-                return RedirectToAction("Login", "Login");
-
-            using (HttpClient client = new HttpClient())
-            {
-                client.BaseAddress = new Uri(@"http://localhost:64303/api/Medicine");
-                var responseMedicine = client.GetAsync("Medicine");
-                responseMedicine.Wait();
-                if (responseMedicine.Result.IsSuccessStatusCode)
-                {
-                    var readMedicine = responseMedicine.Result.Content.ReadAsAsync<IEnumerable<Medicine>>().Result;
-                    return View(readMedicine);
-                }
-                else
-                {
-                    ModelState.AddModelError(string.Empty, "Server error. Please contact administrator.");
-                    return View(new List<Medicine>());
-                }
-            }
+            return View(_contextdb.Medicines.ToList());
         }
+
         public ActionResult Details(int id)
         {
-            if (Session["UserEmail"] == null)
-                return RedirectToAction("Login", "Login");
-            using (HttpClient client = new HttpClient())
+            var medicine = _contextdb.Medicines.Find(id);
+            if (medicine == null)
             {
-                client.BaseAddress = new Uri(@"http://localhost:64303/api/Medicine");
-                var responseMedicine = client.GetAsync($"Medicine/{id}");
-                responseMedicine.Wait();
-                if (responseMedicine.Result.IsSuccessStatusCode)
-                {
-                    var readMedicine = responseMedicine.Result.Content.ReadAsAsync<Medicine>().Result;
-                    return View(readMedicine);
-                }
-                else
-                {
-                    ModelState.AddModelError(string.Empty, "Server error. Please contact administrator.");
-                    return View(new Medicine());
-                }
+                return HttpNotFound();
             }
+            return View(medicine);
         }
+
         public ActionResult Create()
         {
-            if (Session["UserEmail"] == null)
-                return RedirectToAction("Login", "Login");
-
             return View();
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> Create(Medicine medicine, HttpPostedFileBase ImageFile)
+        public ActionResult Create(Medicine medicine, HttpPostedFileBase ImageFile)
         {
-            // Validate model first before processing file
             if (!ModelState.IsValid)
             {
                 return View(medicine);
@@ -88,7 +65,6 @@ namespace WebApplicationDocLab.Controllers
             {
                 var fileName = $"{Guid.NewGuid()}_{Path.GetFileName(ImageFile.FileName)}";
                 var directoryPath = Server.MapPath("~/image/MedicineImage/");
-                // Ensure directory exists
                 if (!Directory.Exists(directoryPath))
                 {
                     Directory.CreateDirectory(directoryPath);
@@ -97,23 +73,11 @@ namespace WebApplicationDocLab.Controllers
                 ImageFile.SaveAs(path);
                 medicine.ImageUrl = fileName;
             }
+
             try
             {
-                // Call API
-                using (var client = new HttpClient())
-                {
-                    client.BaseAddress = new Uri(ConfigurationManager.AppSettings["ApiBaseUrl"] ?? "http://localhost:64303/api/MedicineCreate");
-
-                    var response = await client.PostAsJsonAsync("MedicineCreate", medicine);
-
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        var errorContent = await response.Content.ReadAsStringAsync();
-                        ModelState.AddModelError("", $"API Error: {errorContent}");
-                        return View(medicine);
-                    }
-                }
-
+                _contextdb.Medicines.Add(medicine);
+                _contextdb.SaveChanges();
                 return RedirectToAction("Index");
             }
             catch (Exception ex)
@@ -122,35 +86,32 @@ namespace WebApplicationDocLab.Controllers
                 return View(medicine);
             }
         }
+
         public ActionResult Edit(int id)
         {
-            if (Session["UserEmail"] == null)
-                return RedirectToAction("Login", "Login");
-            using (HttpClient client = new HttpClient())
+            var medicine = _contextdb.Medicines.Find(id);
+            if (medicine == null)
             {
-                client.BaseAddress = new Uri(@"http://localhost:64303/api/Medicine");
-                var responseMedicine = client.GetAsync($"Medicine/{id}");
-                responseMedicine.Wait();
-                if (responseMedicine.Result.IsSuccessStatusCode)
-                {
-                    var readMedicine = responseMedicine.Result.Content.ReadAsAsync<Medicine>().Result;
-                    return View(readMedicine);
-                }
-                else
-                {
-                    ModelState.AddModelError(string.Empty, "Server error. Please contact administrator.");
-                    return View(new Medicine());
-                }
+                return HttpNotFound();
             }
+            return View(medicine);
         }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> Edit(int id, Medicine medicine, HttpPostedFileBase ImageFile)
+        public ActionResult Edit(int id, Medicine medicine, HttpPostedFileBase ImageFile)
         {
             if (!ModelState.IsValid)
             {
                 return View(medicine);
             }
+
+            var existingMedicine = _contextdb.Medicines.Find(id);
+            if (existingMedicine == null)
+            {
+                return HttpNotFound();
+            }
+
             if (ImageFile != null && ImageFile.ContentLength > 0)
             {
                 var fileName = $"{Guid.NewGuid()}_{Path.GetFileName(ImageFile.FileName)}";
@@ -163,19 +124,22 @@ namespace WebApplicationDocLab.Controllers
                 ImageFile.SaveAs(path);
                 medicine.ImageUrl = fileName;
             }
+            else
+            {
+                medicine.ImageUrl = existingMedicine.ImageUrl;
+            }
+
             try
             {
-                using (var client = new HttpClient())
-                {
-                    client.BaseAddress = new Uri(ConfigurationManager.AppSettings["ApiBaseUrl"] ?? "http://localhost:64303/api/MedicineUpdate");
-                    var response = await client.PutAsJsonAsync($"MedicineUpdate/{id}", medicine);
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        var errorContent = await response.Content.ReadAsStringAsync();
-                        ModelState.AddModelError("", $"API Error: {errorContent}");
-                        return View(medicine);
-                    }
-                }
+                existingMedicine.MedicineName = medicine.MedicineName;
+                existingMedicine.Description = medicine.Description;
+                existingMedicine.GenericName = medicine.GenericName;
+                existingMedicine.MedicineCategory = medicine.MedicineCategory;
+                existingMedicine.Category = medicine.Category;
+                existingMedicine.BrandName = medicine.BrandName;
+                existingMedicine.ImageUrl = medicine.ImageUrl;
+
+                _contextdb.SaveChanges();
                 return RedirectToAction("Index");
             }
             catch (Exception ex)
@@ -184,56 +148,31 @@ namespace WebApplicationDocLab.Controllers
                 return View(medicine);
             }
         }
-        //public ActionResult Delete(int id)
-        //{
-        //    if (Session["UserEmail"] == null)
-        //        return RedirectToAction("Login", "Login");
-        //    using (HttpClient client = new HttpClient())
-        //    {
-        //        client.BaseAddress = new Uri(@"http://localhost:64303/api/Medicine");
-        //        var responseMedicine = client.GetAsync($"Medicine/{id}");
-        //        responseMedicine.Wait();
-        //        if (responseMedicine.Result.IsSuccessStatusCode)
-        //        {
-        //            var readMedicine = responseMedicine.Result.Content.ReadAsAsync<Medicine>().Result;
-        //            return View(readMedicine);
-        //        }
-        //        else
-        //        {
-        //            ModelState.AddModelError(string.Empty, "Server error. Please contact administrator.");
-        //            return View(new Medicine());
-        //        }
-        //    }
-        //}
+
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> Delete(int id)
+        public ActionResult Delete(int id)
         {
+            var medicine = _contextdb.Medicines.Find(id);
+            if (medicine == null)
+            {
+                TempData["DeleteError"] = "The medicine could not be found.";
+                return RedirectToAction("Index");
+            }
+
             try
             {
-                // Correct base address to the API root, not the action
-                _httpClient.BaseAddress = new Uri("http://localhost:64303/api/");
-
-                // Proper API delete call
-                var response = await _httpClient.DeleteAsync($"MedicineDelete/{id}");
-
-                if (response.IsSuccessStatusCode)
-                {
-                    TempData["DeleteSuccess"] = "The medicine has been deleted successfully.";
-                }
-                else
-                {
-                    TempData["DeleteError"] = "Failed to delete the medicine. Please try again.";
-                }
+                _contextdb.Medicines.Remove(medicine);
+                _contextdb.SaveChanges();
+                TempData["DeleteSuccess"] = "The medicine has been deleted successfully.";
             }
             catch (Exception ex)
             {
                 TempData["DeleteError"] = "An error occurred while deleting the medicine: " + ex.Message;
             }
 
-            return RedirectToAction("Index"); // Go back to the medicine list page
+            return RedirectToAction("Index");
         }
 
     }
 }
-

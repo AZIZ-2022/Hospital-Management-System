@@ -1,4 +1,4 @@
-﻿@model IEnumerable<WebApplicationDocLab.Models.BookingAppointment>
+@model IEnumerable<WebApplicationDocLab.Models.BookingAppointment>
 @{
     ViewBag.Title = "Appointments";
     Layout = "~/Views/_LayoutPageDoctor.cshtml";
@@ -291,14 +291,14 @@
                                     <tr>
                                         <td>
                                             <div class="patient-info">
-                                                @if (item.User_Info != null)
+                                                @if (item.Patient != null)
                                                 {
-                                                    <img src="@Url.Content("~/Content/PatientImages/" + (item.User_Info.Image ?? "default.jpg"))"
+                                                    <img src="@Url.Content("~/Content/PatientImages/" + (item.Patient.Image ?? "default.jpg"))"
                                                          class="patient-avatar"
-                                                         alt="@item.User_Info.FirstName">
+                                                         alt="@item.Patient.FirstName">
                                                     <div>
-                                                        <div class="patient-name">@item.User_Info.FirstName @item.User_Info.LastName</div>
-                                                        <div class="patient-id">#PT@(item.User_Info.Id.ToString("D4"))</div>
+                                                        <div class="patient-name">@item.Patient.FirstName @item.Patient.LastName</div>
+                                                        <div class="patient-id">#PT@(item.Patient.Id.ToString("D4"))</div>
                                                     </div>
                                                 }
                                                 else
@@ -312,11 +312,11 @@
                                             <div class="appointment-time">@item.Booking_Date.ToString("h:mm tt")</div>
                                         </td>
                                         <td>
-                                            @if (item.User_Info != null)
+                                            @if (item.Patient != null)
                                             {
                                                 <div class="d-flex align-items-center">
                                                     <i class="fas fa-phone text-primary me-2"></i>
-                                                    @item.User_Info.Phone
+                                                    @item.Patient.Phone
                                                 </div>
                                             }
                                             else

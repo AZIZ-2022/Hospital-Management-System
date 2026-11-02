@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data.Entity;
 using System.IO;
@@ -10,6 +10,7 @@ using System.Web.Mvc;
 using WebApplicationDocLab.Context;
 using WebApplicationDocLab.Models;
 using System.Globalization;
+using WebApplicationDocLab.Security;
 
 namespace WebApplicationDocLab.Controllers
 {
@@ -274,11 +275,15 @@ namespace WebApplicationDocLab.Controllers
                     model.createdBy = Session["UserEmail"].ToString();
                     model.CreatedDate = DateTime.Now;
 
+                    string plainTextPassword = model.Password;
+                    model.Password = PasswordHasher.Hash(model.Password);
+                    model.ConfirmPassword = model.Password;
+
                     _contextdb.User_Infos.Add(model);
                     _contextdb.SaveChanges();
 
-                    // Send email notification
-                    SendDoctorRegistrationEmail(model.Email, model.Password, $"{model.Title} {model.FirstName} {model.LastName}");
+                    // Send email notification (with the one-time plaintext password, before hashing)
+                    SendDoctorRegistrationEmail(model.Email, plainTextPassword, $"{model.Title} {model.FirstName} {model.LastName}");
 
                     TempData["SuccessMessage"] = "Doctor registered successfully and notification email sent!";
                     return RedirectToAction("DoctorDetails");
@@ -300,16 +305,11 @@ namespace WebApplicationDocLab.Controllers
         {
             try
             {
-                var smtpClient = new SmtpClient("smtp.gmail.com") // e.g., smtp.gmail.com
-                {
-                    Port = 587,
-                    Credentials = new NetworkCredential("jahid.hasan1217@gmail.com", "rpxx iroi vvov auor"),
-                    EnableSsl = true,
-                };
+                var smtpClient = WebApplicationDocLab.Infrastructure.EmailSender.CreateClient();
 
                 var mailMessage = new MailMessage
                 {
-                    From = new MailAddress("jahid.hasan1217@gmail.com"),
+                    From = new MailAddress(WebApplicationDocLab.Infrastructure.EmailSender.FromAddress),
                     Subject = "Your doctor account has been successfully created",
                     Body = $" Dear {fullName}\n\n Your doctor account has been successfully created by the administrator.\n\nYour Login Credentials:\nEmail: {email}\nPassword: {password}\nPlease log in using the credentials above and change your password immediately for security reasons.\nYou can access the system using this email and password \nBest regards, contact Administration Team",
                     IsBodyHtml = false, 
@@ -409,7 +409,8 @@ namespace WebApplicationDocLab.Controllers
             var admin = _contextdb.User_Infos.Find(id);
             if (admin != null)
             {
-                if (admin.Password == Password) // You can use password hashing if implemented
+                bool needsRehash;
+                if (PasswordHasher.Verify(Password, admin.Password, out needsRehash))
                 {
                     admin.Status = "Delete"; // Consider "Inactive" instead of "Active" for deactivation
                     _contextdb.Entry(admin).State = EntityState.Modified;
@@ -465,8 +466,11 @@ namespace WebApplicationDocLab.Controllers
                     model.UserType = "Admin";
                     model.createdBy = Session["UserEmail"].ToString();
                     model.CreatedDate = DateTime.Now;
-                    // Send email notification
+                    // Send email notification (with the one-time plaintext password, before hashing)
                     SendAdminRegistrationEmail(model.Email, model.Password, $"{model.Title} {model.FirstName} {model.LastName}");
+
+                    model.Password = PasswordHasher.Hash(model.Password);
+                    model.ConfirmPassword = model.Password;
 
                     // Save to database
                     _contextdb.User_Infos.Add(model);
@@ -488,16 +492,11 @@ namespace WebApplicationDocLab.Controllers
 
             try
             {
-                var smtpClient = new SmtpClient("smtp.gmail.com") // e.g., smtp.gmail.com
-                {
-                    Port = 587,
-                    Credentials = new NetworkCredential("jahid.hasan1217@gmail.com", "rpxx iroi vvov auor"),
-                    EnableSsl = true,
-                };
+                var smtpClient = WebApplicationDocLab.Infrastructure.EmailSender.CreateClient();
 
                 var mailMessage = new MailMessage
                 {
-                    From = new MailAddress("jahid.hasan1217@gmail.com"),
+                    From = new MailAddress(WebApplicationDocLab.Infrastructure.EmailSender.FromAddress),
                     Subject = "Your Admin account has been successfully created",
                     Body = $" Dear {fullName}\n\n Your admin account has been successfully created by the administrator.\n\nYour Login Credentials:\nEmail: {email}\nPassword: {password}\nPlease log in using the credentials above and change your password immediately for security reasons.\nYou can access the system using this email and password \nBest regards, contact Administration Team",
                     IsBodyHtml = false,
@@ -569,7 +568,7 @@ namespace WebApplicationDocLab.Controllers
                                         PatientId = a.PatientId,
                                         PatientName = p.FirstName + " " + p.LastName,
                                         DoctorId = a.DoctorId,
-                                        DoctorName = d.FirstName+""+p.LastName,
+                                        DoctorName = d.FirstName + " " + d.LastName,
                                         BookType = a.BookType,
                                         Booking_Date = a.Booking_Date,
                                         ActualTime = a.ActualTime

@@ -1,4 +1,4 @@
-﻿@model IEnumerable<WebApplicationDocLab.Models.BookingAppointment>
+@model IEnumerable<WebApplicationDocLab.Models.BookingAppointment>
 @using WebApplicationDocLab.Models
 
 @{
@@ -184,34 +184,33 @@
             <small>Last Updated: @DateTime.Now.ToString("dd MMM yyyy")</small>
         </div>
         <div class="card-body">
-            @if (ViewBag.RecentPrescription?.Doctor_Details?.User_Info == null)
+            @if (ViewBag.RecentPrescription != null)
             {
                     var pres = ViewBag.RecentPrescription;
+                    var presDoctor = ViewBag.RecentPrescriptionDoctor as WebApplicationDocLab.Models.User_Info;
                     <div>
                         <h5>Doctor:</h5>
                         <p class="mb-0">
-                            @*@ViewBag.RecentPrescription.Doctor_Details.User_Info.Title
-                            @ViewBag.RecentPrescription.Doctor_Details.User_Info.FirstName
-                            @ViewBag.RecentPrescription.Doctor_Details.User_Info.LastName*@
+                            @(presDoctor != null ? $"{presDoctor.Title} {presDoctor.FirstName} {presDoctor.LastName}" : "N/A")
                         </p>
 
                         <h5>Prescription Date:</h5>
                         <p>@pres.PrescriptionDate.ToString("dd MMM yyyy")</p>
 
-                        @*<h5>Medicines:</h5>
-                    @if (ViewBag.MedicineList != null && ViewBag.MedicineList.Count > 0)
-                    {
-                        <ul>
-                            @foreach (var med in ViewBag.MedicineList)
-                            {
-                                <li>@med.Medicine.Id</li>
-                            }
-                        </ul>
-                    }
-                    else
-                    {
-                        <p>No medicines prescribed.</p>
-                    }*@
+                        <h5>Medicines:</h5>
+                        @if (ViewBag.MedicineList != null && ViewBag.MedicineList.Count > 0)
+                        {
+                            <ul>
+                                @foreach (var med in ViewBag.MedicineList)
+                                {
+                                    <li>@(med.Medicine != null ? med.Medicine.MedicineName : "Unknown") (@med.Dosage, @med.Duration)</li>
+                                }
+                            </ul>
+                        }
+                        else
+                        {
+                            <p>No medicines prescribed.</p>
+                        }
 
                         <h5>Tests:</h5>
                         @if (ViewBag.TestList != null && ViewBag.TestList.Count > 0)
@@ -277,13 +276,12 @@
                                 <tr>
                                     <td>
                                         <div class="d-flex align-items-center">
-                                            <img src="https://ui-avatars.com/api/?name=@(appointment.User_Info?.FirstName)+@(appointment.User_Info?.LastName)&background=4e73df&color=fff"
+                                            <img src="https://ui-avatars.com/api/?name=@(appointment.Doctor?.FirstName)+@(appointment.Doctor?.LastName)&background=4e73df&color=fff"
                                                  class="rounded-circle me-3" width="40" height="40" alt="Doctor">
                                             <div>
-                                                @if (appointment.User_Info != null)
+                                                @if (appointment.Doctor != null)
                                                 {
-                                                    <h6 class="mb-0">@($"{appointment.User_Info.Title} {appointment.User_Info.FirstName} {appointment.User_Info.LastName}")</h6>
-                                                    @*<small class="text-muted">@appointment.Doctor_Details.Specialization</small>*@
+                                                    <h6 class="mb-0">@($"{appointment.Doctor.Title} {appointment.Doctor.FirstName} {appointment.Doctor.LastName}")</h6>
                                                 }
                                             </div>
                                         </div>

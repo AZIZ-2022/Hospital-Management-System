@@ -33,8 +33,19 @@ namespace WebApplicationDocLab.Context
         public virtual DbSet<Doctor_Type> Doctor_Types{ get; set; }
         public virtual DbSet<Payment> Payments { get; set; }
         public virtual DbSet<Medical_History> Medical_Histories { get; set; }
-        public virtual DbSet<Message> Messages { get; set; }
+              public virtual DbSet<Message> Messages { get; set; }
         public virtual DbSet<Feedback> Feedbacks { get; set; }
+
+        protected override void OnModelCreating(DbModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<BookingAppointment>()
+                .HasRequired(b => b.Doctor)
+                .WithMany()
+                .HasForeignKey(b => b.DoctorId)
+                .WillCascadeOnDelete(false);
+
+            base.OnModelCreating(modelBuilder);
+        }
     }
 
     //public class MyEntity

@@ -1,13 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Net.Http;
-using System.Web;
 using System.Web.Mvc;
 using WebApplicationDocLab.Models;
 using WebApplicationDocLab.Context;
-using System.Net;
-using System.Threading.Tasks;
 using System.Data.Entity;
 
 namespace WebApplicationDocLab.Controllers
@@ -15,67 +9,55 @@ namespace WebApplicationDocLab.Controllers
     public class MTController : Controller
     {
         private DoctorLab _contextdb;
-        private HttpClient _httpClient;
         public MTController()
         {
             _contextdb = new DoctorLab();
-            this._httpClient = new HttpClient();
         }
+
+        protected override void OnActionExecuting(ActionExecutingContext filterContext)
+        {
+            if (Session["UserEmail"] == null || Session["UserType"] == null || Session["UserType"].ToString() != "Admin")
+            {
+                filterContext.Result = new RedirectToRouteResult(
+                    new System.Web.Routing.RouteValueDictionary {
+                        { "controller", "Login" },
+                        { "action", "Login" }
+                    });
+            }
+
+            base.OnActionExecuting(filterContext);
+        }
+
         // GET: MT
         public ActionResult Index()
         {
-            if (Session["UserEmail"] == null)
-                return RedirectToAction("Login", "Login");
-
-            using (HttpClient client = new HttpClient())
-            {
-                client.BaseAddress = new Uri(@"http://localhost:64303/api/Text");
-                var responseTask = client.GetAsync("Text");
-                responseTask.Wait();
-                if (responseTask.Result.IsSuccessStatusCode)
-                {
-                    var readTask = responseTask.Result.Content.ReadAsAsync<IEnumerable<Test>>().Result;
-                    return View(readTask);
-                }
-                else
-                {
-                    ModelState.AddModelError(string.Empty, "Server error. Please contact administrator.");
-                    return View(new List<Test>());
-                }
-            }
+            return View(_contextdb.Tests.ToList());
         }
-        // GET: MT/Create
+
+        // GET: MT/Details/5
         public ActionResult Details(int? id)
         {
-            if (Session["UserEmail"] == null)
-                return RedirectToAction("Login", "Login");
-            _httpClient.BaseAddress = new Uri(@"http://localhost:64303/api/Text");
-            var response = _httpClient.GetAsync("Text/" + id.ToString());
-            response.Wait();
-            if (response.Result.IsSuccessStatusCode)
+            var test = _contextdb.Tests.Find(id);
+            if (test == null)
             {
-                var data = response.Result.Content.ReadAsAsync<Test>().Result;
-                return View(data);
+                return HttpNotFound();
             }
-            return HttpNotFound();
+            return View(test);
         }
 
-        // POST: Save updated data to API
+        // GET: MT/Edit/5
         public ActionResult Edit(int? id)
         {
-            if (Session["UserEmail"] == null)
-                return RedirectToAction("Login", "Login");
-            _httpClient.BaseAddress = new Uri(@"http://localhost:64303/api/Text");
-            var response = _httpClient.GetAsync("Text/" + id.ToString());
-            response.Wait();
-            if (response.Result.IsSuccessStatusCode)
+            var test = _contextdb.Tests.Find(id);
+            if (test == null)
             {
-                var data = response.Result.Content.ReadAsAsync<Test>().Result;
-                return View(data);
+                return HttpNotFound();
             }
-            return HttpNotFound();
+            return View(test);
         }
+
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public ActionResult Edit([Bind(Include = "Id,TestName,Category,Created_at")] Test test)
         {
             if (ModelState.IsValid)
@@ -86,13 +68,13 @@ namespace WebApplicationDocLab.Controllers
             }
             return View(test);
         }
+
         // GET: MT/Create
         public ActionResult Create()
         {
-            if (Session["UserEmail"] == null)
-                return RedirectToAction("Login", "Login");
             return View();
         }
+
         // POST: MT/Create
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -106,44 +88,38 @@ namespace WebApplicationDocLab.Controllers
             }
             return View(test);
         }
+
         // GET: MT/Delete/5
         public ActionResult Delete(int? id)
         {
-            if (Session["UserEmail"] == null)
-                return RedirectToAction("Login", "Login");
-            _httpClient.BaseAddress = new Uri(@"http://localhost:64303/api/Text");
-            var response = _httpClient.GetAsync("Text/" + id.ToString());
-            response.Wait();
-            if (response.Result.IsSuccessStatusCode)
+            var test = _contextdb.Tests.Find(id);
+            if (test == null)
             {
-                var data = response.Result.Content.ReadAsAsync<Test>().Result;
-                return View(data);
+                return HttpNotFound();
             }
-            return HttpNotFound();
+            return View(test);
         }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> DeleteConfirmed(int id)
+        public ActionResult DeleteConfirmed(int id)
         {
+            var test = _contextdb.Tests.Find(id);
+            if (test == null)
+            {
+                TempData["DeleteError"] = "The test could not be found.";
+                return RedirectToAction("Delete", new { id });
+            }
+
             try
             {
-                _httpClient.BaseAddress = new Uri(@"http://localhost:64303/api/TextDelete");
-                var response = await _httpClient.DeleteAsync($"TextDelete/{id}");
-
-                if (response.IsSuccessStatusCode)
-                {
-                    TempData["DeleteSuccess"] = "The test has been deleted successfully.";
-                    return RedirectToAction("Index");
-                }
-                else
-                {
-                    TempData["DeleteError"] = "Failed to delete the test. Please try again.";
-                    return RedirectToAction("Delete", new { id });
-                }
+                _contextdb.Tests.Remove(test);
+                _contextdb.SaveChanges();
+                TempData["DeleteSuccess"] = "The test has been deleted successfully.";
+                return RedirectToAction("Index");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
-                // Log the error
                 TempData["DeleteError"] = "An error occurred while deleting the test: " + ex.Message;
                 return RedirectToAction("Delete", new { id });
             }
@@ -152,47 +128,22 @@ namespace WebApplicationDocLab.Controllers
 
         public ActionResult TypeIndex()
         {
-            if (Session["UserEmail"] == null)
-                return RedirectToAction("Login", "Login");
-
-            using (HttpClient client = new HttpClient())
-            {
-                client.BaseAddress = new Uri(@"http://localhost:64303/api/Type");
-                var responseTask = client.GetAsync("Type");
-                responseTask.Wait();
-                if (responseTask.Result.IsSuccessStatusCode)
-                {
-                    var readTask = responseTask.Result.Content.ReadAsAsync<IEnumerable<Doctor_Type>>().Result;
-                    return View(readTask);
-                }
-                else
-                {
-                    ModelState.AddModelError(string.Empty, "Server error. Please contact administrator.");
-                    return View(new List<Doctor_Type>());
-                }
-
-            }
+            return View(_contextdb.Doctor_Types.ToList());
         }
+
         public ActionResult TypeEdit(int? id)
         {
-            if (Session["UserEmail"] == null)
-                return RedirectToAction("Login", "Login");
-
             if (id == null)
             {
-                return new HttpStatusCodeResult(HttpStatusCode.BadRequest);
+                return new HttpStatusCodeResult(System.Net.HttpStatusCode.BadRequest);
             }
 
-            _httpClient.BaseAddress = new Uri(@"http://localhost:64303/api/Type");
-            var response = _httpClient.GetAsync("Type/" + id.ToString());
-            response.Wait();
-
-            if (response.Result.IsSuccessStatusCode)
+            var doctorType = _contextdb.Doctor_Types.Find(id);
+            if (doctorType == null)
             {
-                var data = response.Result.Content.ReadAsAsync<Doctor_Type>().Result;
-                return View(data);
+                return HttpNotFound();
             }
-            return HttpNotFound();
+            return View(doctorType);
         }
 
         [HttpPost]
@@ -201,66 +152,60 @@ namespace WebApplicationDocLab.Controllers
         {
             if (ModelState.IsValid)
             {
-                _httpClient.BaseAddress = new Uri(@"http://localhost:64303/api/TypeUpdate");
-                var response = _httpClient.PutAsJsonAsync("TypeUpdate/" + doctor_Type.Id, doctor_Type);
-                response.Wait();
-
-                if (response.Result.IsSuccessStatusCode)
+                var existingType = _contextdb.Doctor_Types.Find(doctor_Type.Id);
+                if (existingType == null)
                 {
-                    return RedirectToAction("TypeIndex");
+                    return Json(new { success = false, message = "Doctor type not found" });
                 }
-                return Json(new { success = false, message = "Error updating doctor type" });
+
+                existingType.TypeName = doctor_Type.TypeName;
+                _contextdb.SaveChanges();
+                return RedirectToAction("TypeIndex");
             }
             return Json(new { success = false, message = "Invalid data" });
         }
+
         [HttpGet]
         public ActionResult TypeCreate()
         {
-            if (Session["UserEmail"] == null)
-                return RedirectToAction("Login", "Login");
             return View();
         }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
         public ActionResult TypeCreate([Bind(Include = "Id,TypeName")] Doctor_Type doctor_Type)
         {
             if (ModelState.IsValid)
             {
-                _httpClient.BaseAddress = new Uri(@"http://localhost:64303/api/AddType");
-                var response = _httpClient.PostAsJsonAsync("AddType", doctor_Type);
-                response.Wait();
-                if (response.Result.IsSuccessStatusCode)
-                {
-                    return RedirectToAction("TypeIndex");
-                }
-                return Json(new { success = false, message = "Error creating doctor type" });
+                _contextdb.Doctor_Types.Add(doctor_Type);
+                _contextdb.SaveChanges();
+                return RedirectToAction("TypeIndex");
             }
             return Json(new { success = false, message = "Invalid data" });
         }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> TypeDeleteConfirmed(int id)
+        public ActionResult TypeDeleteConfirmed(int id)
         {
-            try
+            var doctorType = _contextdb.Doctor_Types.Find(id);
+            if (doctorType == null)
             {
-                _httpClient.BaseAddress = new Uri(@"http://localhost:64303/api/TypeDelete");
-                var response = await _httpClient.DeleteAsync($"TypeDelete/{id}");
-                if (response.IsSuccessStatusCode)
-                {
-                    TempData["DeleteSuccess"] = "The doctor type has been deleted successfully.";
-                    return RedirectToAction("TypeIndex");
-                }
-                else
-                {
-                    TempData["DeleteError"] = "Failed to delete the doctor type. Please try again.";
-                    return RedirectToAction("TypeIndex");
-                }
-            }
-            catch (Exception ex)
-            {
-                TempData["DeleteError"] = "An error occurred while deleting the doctor type: " + ex.Message;
+                TempData["DeleteError"] = "The doctor type could not be found.";
                 return RedirectToAction("TypeIndex");
             }
+
+            try
+            {
+                _contextdb.Doctor_Types.Remove(doctorType);
+                _contextdb.SaveChanges();
+                TempData["DeleteSuccess"] = "The doctor type has been deleted successfully.";
+            }
+            catch (System.Exception ex)
+            {
+                TempData["DeleteError"] = "An error occurred while deleting the doctor type: " + ex.Message;
+            }
+            return RedirectToAction("TypeIndex");
         }
 
 

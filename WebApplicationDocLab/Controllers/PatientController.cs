@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data.Entity;
 using System.Linq;
@@ -8,8 +8,6 @@ using WebApplicationDocLab.Models;
 using iTextSharp.text;
 using iTextSharp.text.pdf;
 using System.IO;
-using System.Net.Http;
-using System.Configuration;
 using System.Threading.Tasks;
 
 
@@ -18,13 +16,10 @@ namespace WebApplicationDocLab.Controllers
     public class PatientController : Controller
     {
         private DoctorLab _contextdb;
-        private HttpClient _httpClient;
 
         public PatientController()
         {
             _contextdb = new DoctorLab();
-            _httpClient = new HttpClient();
-            _httpClient.BaseAddress = new Uri(ConfigurationManager.AppSettings["ApiBaseUrl"] ?? "http://localhost:64303/api/");
         }
 
         // GET: Patient Dashboard
@@ -39,30 +34,10 @@ namespace WebApplicationDocLab.Controllers
 
             // Appointments
             var appointments = _contextdb.BookingAppointments
-        .Where(x => x.PatientId == patientId)
-        .Join(_contextdb.User_Infos,
-            appointment => appointment.DoctorId,
-            doctor => doctor.Id,
-            (appointment, doctor) => new
-            {
-                Appointment = appointment,
-                Doctor = doctor
-            })
-        .ToList()
-        .Select(x => new BookingAppointment
-        {
-            Id = x.Appointment.Id,
-            PatientId = x.Appointment.PatientId,
-            DoctorId = x.Appointment.DoctorId,
-            Booking_Date = x.Appointment.Booking_Date,
-            ActualTime = x.Appointment.ActualTime,
-            SerialNumber = x.Appointment.SerialNumber,
-            BookType = x.Appointment.BookType,
-            Created_at = x.Appointment.Created_at,
-            User_Info = x.Doctor
-        })
-        .OrderByDescending(a => a.Booking_Date)
-        .ToList();
+                .Where(x => x.PatientId == patientId)
+                .Include(a => a.Doctor)
+                .OrderByDescending(a => a.Booking_Date)
+                .ToList();
 
             // Medical History
             var medicalHistory = _contextdb.Medical_Histories
@@ -73,31 +48,18 @@ namespace WebApplicationDocLab.Controllers
             // Most recent prescription
             var recentPrescription = _contextdb.Prescriptions
                 .Where(p => p.PatientId == patientId)
-                .Include(p => p.Doctor_Details.User_Info)
-                .Include(p => p.Doctor_Details)
-                .Include(p => p.Doctor_Details.User_Info)
-
+                .Include(p => p.Medicine_Lists.Select(m => m.Medicine))
+                .Include(p => p.Test_Lists.Select(t => t.Test))
                 .OrderByDescending(p => p.PrescriptionDate)
                 .FirstOrDefault();
 
-            var medicineList = new List<Medicine_List>();
-            var testList = new List<Test_List>();
+            var recentPrescriptionDoctor = recentPrescription != null
+                ? _contextdb.User_Infos.Find(recentPrescription.DoctorId)
+                : null;
 
-            if (recentPrescription != null)
-            {
-                medicineList = _contextdb.Medicine_Lists
-                    .Where(m => m.PrescriptionId == recentPrescription.Id)
-                    .Include(m => m.Medicine)
-                    .ToList();
-
-                testList = _contextdb.Test_Lists
-                    .Where(t => t.PrescriptionId == recentPrescription.Id)
-                    .Include(t => t.Test)
-                    .ToList();
-            }
-
-            ViewBag.MedicineList = medicineList;
-            ViewBag.TestList = testList;
+            ViewBag.MedicineList = recentPrescription?.Medicine_Lists?.ToList() ?? new List<Medicine_List>();
+            ViewBag.TestList = recentPrescription?.Test_Lists?.ToList() ?? new List<Test_List>();
+            ViewBag.RecentPrescriptionDoctor = recentPrescriptionDoctor;
             ViewBag.RecentPrescription = recentPrescription;
             ViewBag.Appointments = appointments;
             ViewBag.MedicalHistory = medicalHistory;
@@ -263,7 +225,7 @@ namespace WebApplicationDocLab.Controllers
 
             // Get appointments with doctor info and order by date (future appointments first)
             var appointments = _contextdb.BookingAppointments
-                .Include(a => a.User_Info) // Eager load doctor data
+                .Include(a => a.Doctor) // Eager load doctor info
                 .Where(a => a.PatientId == patientId)
                 .OrderBy(a => a.Booking_Date < DateTime.Today) // Past appointments last
                 .ThenBy(a => a.Booking_Date) // Then by date
@@ -552,13 +514,17 @@ namespace WebApplicationDocLab.Controllers
             // Get the current patient's Id from session
             int patientId = (int)Session["UserId"];
 
-            // Get the most recent prescription for the patient, including Doctor_Details and Medicine
+            // Get the most recent prescription for the patient
             var recentPrescription = _contextdb.Prescriptions
                 .Where(x => x.PatientId == patientId)
-                .Include(x => x.Doctor_Details)  // Eager load the Doctor_Details
-                .Include(x => x.Medicine)        // Eager load the Medicine
+                .Include(x => x.Medicine_Lists.Select(m => m.Medicine))
+                .Include(x => x.Test_Lists.Select(t => t.Test))
                 .OrderByDescending(x => x.PrescriptionDate)  // Sort by PrescriptionDate descending
                 .FirstOrDefault();  // Get the most recent one
+
+            ViewBag.RecentPrescriptionDoctor = recentPrescription != null
+                ? _contextdb.User_Infos.Find(recentPrescription.DoctorId)
+                : null;
 
             // Pass the most recent prescription to the view
             ViewBag.RecentPrescription = recentPrescription;
@@ -585,13 +551,22 @@ namespace WebApplicationDocLab.Controllers
                 .OrderByDescending(x => x.PrescriptionDate)
                 .FirstOrDefault();
 
+            if (recentPrescription == null)
+            {
+                return View(new List<Prescription>());
+            }
+
             // Get all previous prescriptions, excluding the most recent one
             var previousPrescriptions = _contextdb.Prescriptions
-                .Where(x => x.PatientId == patientId && x.PrescriptionDate != recentPrescription.PrescriptionDate)
-                .Include(x => x.Doctor_Details)  // Eagerly load Doctor_Details
-                .Include(x => x.Medicine)        // Eagerly load Medicine
+                .Where(x => x.PatientId == patientId && x.Id != recentPrescription.Id)
+                .Include(x => x.Medicine_Lists.Select(m => m.Medicine))
                 .OrderByDescending(x => x.PrescriptionDate)  // Sort by PrescriptionDate descending
                 .ToList();  // Execute the query
+
+            var doctorIds = previousPrescriptions.Select(p => p.DoctorId).Distinct().ToList();
+            ViewBag.Doctors = _contextdb.User_Infos
+                .Where(u => doctorIds.Contains(u.Id))
+                .ToDictionary(u => u.Id);
 
             // Pass the list of previous prescriptions to the view
             return View(previousPrescriptions);
@@ -710,7 +685,6 @@ namespace WebApplicationDocLab.Controllers
 
                 // Fetch related appointment and user info
                 var appointment = _contextdb.BookingAppointments
-                    .Include("User_Info")
                     .FirstOrDefault(a => a.Id == payment.AppointmentId);
 
                 // Fetch patient info
@@ -862,23 +836,16 @@ namespace WebApplicationDocLab.Controllers
                 return RedirectToAction("Login", "Login");
 
             int userId = (int)Session["UserId"];
-
-            using (var client = new HttpClient())
+            var profile = _contextdb.User_Infos.Find(userId);
+            if (profile == null)
             {
-                client.BaseAddress = new Uri("http://localhost:64303/api/");
-                var response = client.GetAsync($"Profile/{userId}").Result;
-
-                if (response.IsSuccessStatusCode)
-                {
-                    var profile = response.Content.ReadAsAsync<User_Info>().Result;
-                    return View(profile);
-                }
-                else
-                {
-                    ModelState.AddModelError(string.Empty, "Server error. Please contact administrator.");
-                    return View(new User_Info());
-                }
+                ModelState.AddModelError(string.Empty, "Profile not found.");
+                return View(new User_Info());
             }
+
+            profile.Password = null;
+            profile.ConfirmPassword = null;
+            return View(profile);
         }
 
         // GET: Patient/EditProfile
@@ -888,23 +855,16 @@ namespace WebApplicationDocLab.Controllers
                 return RedirectToAction("Login", "Login");
 
             int userId = (int)Session["UserId"];
-
-            using (var client = new HttpClient())
+            var profile = _contextdb.User_Infos.Find(userId);
+            if (profile == null)
             {
-                client.BaseAddress = new Uri("http://localhost:64303/api/");
-                var response = client.GetAsync($"Profile/{userId}").Result;
-
-                if (response.IsSuccessStatusCode)
-                {
-                    var profile = response.Content.ReadAsAsync<User_Info>().Result;
-                    return View(profile);
-                }
-                else
-                {
-                    ModelState.AddModelError(string.Empty, "Server error. Please contact administrator.");
-                    return View(new User_Info());
-                }
+                ModelState.AddModelError(string.Empty, "Profile not found.");
+                return View(new User_Info());
             }
+
+            profile.Password = null;
+            profile.ConfirmPassword = null;
+            return View(profile);
         }
 
         // POST: Patient/EditProfile
@@ -988,29 +948,22 @@ namespace WebApplicationDocLab.Controllers
                 return RedirectToAction("Login", "Login");
 
             int userId = (int)Session["UserId"];
-
-            using (var client = new HttpClient())
+            var profile = _contextdb.User_Infos.Find(userId);
+            if (profile == null)
             {
-                client.BaseAddress = new Uri("http://localhost:64303/api/");
-                var response = client.GetAsync($"Profile/{userId}").Result;
-
-                if (response.IsSuccessStatusCode)
-                {
-                    var profile = response.Content.ReadAsAsync<User_Info>().Result;
-                    return View(profile);
-                }
-                else
-                {
-                    ModelState.AddModelError(string.Empty, "Server error. Please contact administrator.");
-                    return View(new User_Info());
-                }
+                ModelState.AddModelError(string.Empty, "Profile not found.");
+                return View(new User_Info());
             }
+
+            profile.Password = null;
+            profile.ConfirmPassword = null;
+            return View(profile);
         }
 
         // POST: Patient/DeleteProfile
         [HttpPost, ActionName("DeleteProfile")]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> DeleteProfileConfirmed()
+        public ActionResult DeleteProfileConfirmed()
         {
             if (Session["UserId"] == null)
                 return RedirectToAction("Login", "Login");
@@ -1018,25 +971,21 @@ namespace WebApplicationDocLab.Controllers
             try
             {
                 int userId = (int)Session["UserId"];
+                var profile = _contextdb.User_Infos.Find(userId);
 
-                using (var client = new HttpClient())
+                if (profile != null)
                 {
-                    client.BaseAddress = new Uri("http://localhost:64303/api/");
-                    // Change this line to use "Profile" instead of "ProfileDelete"
-                    var response = await client.DeleteAsync($"Profile/{userId}");
+                    _contextdb.User_Infos.Remove(profile);
+                    _contextdb.SaveChanges();
 
-                    if (response.IsSuccessStatusCode)
-                    {
-                        Session.Clear(); // Clear the session
-                        TempData["SuccessMessage"] = "Your profile has been deleted successfully.";
-                        return RedirectToAction("Index", "Home");
-                    }
-                    else
-                    {
-                        var errorContent = await response.Content.ReadAsStringAsync();
-                        TempData["ErrorMessage"] = $"Failed to delete profile: {errorContent}";
-                        return RedirectToAction("Profile");
-                    }
+                    Session.Clear(); // Clear the session
+                    TempData["SuccessMessage"] = "Your profile has been deleted successfully.";
+                    return RedirectToAction("Index", "Home");
+                }
+                else
+                {
+                    TempData["ErrorMessage"] = "Failed to delete profile: profile not found.";
+                    return RedirectToAction("Profile");
                 }
             }
             catch (Exception ex)
